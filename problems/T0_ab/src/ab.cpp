@@ -1,6 +1,8 @@
 #include "ab.hpp"
 
-// 本题提供完整实现，演示测评机调用题目接口时执行的代码。
-int add(int a, int b) {
-    return a + b;
+// 构造函数保存输入；测评机随后通过 sum() 获取计算结果。
+Solver::Solver(int a, int b): a_(a), b_(b) {}
+
+int Solver::sum() const {
+    return a_ + b_;
 }
