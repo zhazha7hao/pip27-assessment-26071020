@@ -22,7 +22,7 @@ public:
         std::size_t left, std::size_t right, std::size_t k) const;
 
 private:
-    // 实现细节放在 src/ 中，使考生能更换数据结构而不改变固定接口的布局。
+    // 实现细节放在 src/ 中
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
