@@ -20,7 +20,7 @@ BipartiteMatcher::BipartiteMatcher(std::uint32_t left_count, std::uint32_t right
 BipartiteMatcher::~BipartiteMatcher() = default;
 
 std::vector<std::int32_t> BipartiteMatcher::maximumWeightMatching() const {
-    // TODO: 返回总权重最大的合法匹配。
-    // 当前占位实现只返回空匹配，不能通过包含正权边的测试。
+    // 请实现总权重最大的非空合法匹配；无边时返回全 -1 表示无解。
+    // 当前占位实现只能处理无边输入，任何有边的测试都会失败。
     return std::vector<std::int32_t>(impl_->left_count, -1);
 }
