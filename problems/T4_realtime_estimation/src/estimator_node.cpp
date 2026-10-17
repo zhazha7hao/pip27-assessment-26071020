@@ -17,7 +17,6 @@ constexpr std::int64_t kExtra1Mode = 1;
 constexpr std::int64_t kExtra2Mode = 2;
 constexpr std::int64_t kExtra3Mode = 3;
 
-// 预测数组采样间隔固定 5 ms
 constexpr double kPredictionStepSeconds = 0.005;
 constexpr std::int64_t kPredictionStepNs = 5'000'000;
 
@@ -46,13 +45,13 @@ struct ModeTuning {
   double vel_decay = 1e9;
   double acc_decay = 1e9;
 };
-
+//参数
 ModeTuning tuning_for_mode(std::int64_t mode) {
   switch (mode) {
     case kExtra1Mode:
-      return {21, 300.0, 6.0, 6.0};
+      return {21, 100.0, 12.0, 6.0};
     case kExtra2Mode:
-      return {41, 100.0, 4.0, 6.0};
+      return {41, 30.0, 4.0, 1e9};
     case kExtra3Mode:
       return {101, 100.0, 4.0, 1.5};
     default:
@@ -83,7 +82,7 @@ class KalmanFilter {
     x_ = Vec3{p0, 0.0, 0.0};
     P_ = Mat3{};
     P_.m[0][0] = P_.m[1][1] = P_.m[2][2] = 1.0;
-    R_ = 1.0;  // 观测噪声方差，随后在线自适应
+    R_ = 0.1;
     q_ = jerk_psd;
     last_stamp_ns_ = stamp_ns;
   }
@@ -343,7 +342,7 @@ class EstimatorNode final : public rclcpp::Node {
   rclcpp::TimerBase::SharedPtr prediction_timer_;
 };
 
-}  // namespace signal_estimator
+}
 
 int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
