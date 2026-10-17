@@ -4,7 +4,7 @@
 
 // 在此定义存储结构并实现算法；初始空结构仅保证模板可以编译。
 struct DynamicKth::Impl {
-    static constexpr std::size_t size = 9000;
+    static constexpr std::size_t size = 800;
     struct block {
         std::vector<int> elems;
         std::vector<int> sorted_elems;
