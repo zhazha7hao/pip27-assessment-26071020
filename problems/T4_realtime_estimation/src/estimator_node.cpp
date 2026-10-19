@@ -1,5 +1,4 @@
 #include "t4_realtime_estimation/msg/signal_packet.hpp"
-
 #include <rcl_interfaces/msg/set_parameters_result.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -203,7 +202,7 @@ class EstimatorNode final : public rclcpp::Node {
     mode_ = declare_parameter<std::int64_t>(kModeParameter, -1);
     tuning_ = tuning_for_mode(mode_);
 
-    const auto qos = rclcpp::QoS(rclcpp::KeepLast(256)).reliable().durability_volatile();
+    const auto qos = rclcpp::QoS(rclcpp::KeepLast(256)).reliable();
 
     observation_subscription_ = create_subscription<Packet>(
         kObservationTopic, qos,
@@ -239,7 +238,7 @@ class EstimatorNode final : public rclcpp::Node {
       first_obs_received_ = true;
       anchor_virtual_ns_ = stamp_ns; // 首帧观测时间戳
       anchor_real_time_ = resolve_anchor_real_time(message_info); // 首帧观测本机时间
-      next_virtual_stamp_ns_ = stamp_ns;
+      next_virtual_stamp_ns_ = stamp_ns; // 下一次预报时间戳起点
       kf_.init(value, stamp_ns, tuning_.jerk_psd);
 
       if (mode_ == kBasicMode) {
@@ -256,6 +255,7 @@ class EstimatorNode final : public rclcpp::Node {
       kf_.update(value);
       publish_packet(estimate_publisher_, stamp_ns, {kf_.state_at(stamp_ns).v[0]});
     } else {
+      // 扩展模式：存入观测缓冲区，等待预测点统一计算发布
       obs_buffer_.push_back({stamp_ns, value});
     }
   }
@@ -330,9 +330,9 @@ class EstimatorNode final : public rclcpp::Node {
   KalmanFilter kf_;
 
   bool first_obs_received_ = false;
-  std::int64_t anchor_virtual_ns_ = 0;
-  std::chrono::steady_clock::time_point anchor_real_time_;
-  std::int64_t next_virtual_stamp_ns_ = 0;
+  std::int64_t anchor_virtual_ns_ = 0;  // 首帧观测时间戳
+  std::chrono::steady_clock::time_point anchor_real_time_; // 首帧观测本机时间
+  std::int64_t next_virtual_stamp_ns_ = 0; // 下一次预报时间戳起点
   std::deque<Sample> obs_buffer_;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_;
