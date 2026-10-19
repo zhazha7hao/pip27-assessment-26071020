@@ -78,30 +78,30 @@ inline Vec3 mat_vec_mul(const Mat3& A, const Vec3& x) {
 class KalmanFilter {
  public:
   void init(double p0, std::int64_t stamp_ns, double jerk_psd) {
-    x_ = Vec3{p0, 0.0, 0.0};
+    x_ = Vec3{p0, 0.0, 0.0}; // 初始状态：位置、速度、加速度
     P_ = Mat3{};
-    P_.m[0][0] = P_.m[1][1] = P_.m[2][2] = 1.0;
-    R_ = 0.1;
-    q_ = jerk_psd;
-    last_stamp_ns_ = stamp_ns;
+    P_.m[0][0] = P_.m[1][1] = P_.m[2][2] = 1.0; // 初始协方差：位置、速度、加速度
+    R_ = 0.1; // 观测噪声协方差
+    q_ = jerk_psd; // 过程噪声协方差
+    last_stamp_ns_ = stamp_ns; // 上一帧时间戳
   }
 
   // 时间推进到 stamp_ns（含协方差传播）
   void predict(std::int64_t stamp_ns) {
-    const double dt = static_cast<double>(stamp_ns - last_stamp_ns_) * 1e-9;
+    const double dt = static_cast<double>(stamp_ns - last_stamp_ns_) * 1e-9; // 时间步长（秒）
     if (dt <= 0.0) return;
 
-    Mat3 F;
-    F.m[0][0] = 1.0; F.m[0][1] = dt;  F.m[0][2] = 0.5 * dt * dt;
-    F.m[1][0] = 0.0; F.m[1][1] = 1.0; F.m[1][2] = dt;
-    F.m[2][0] = 0.0; F.m[2][1] = 0.0; F.m[2][2] = 1.0;
+    Mat3 F; // 状态转移矩阵
+    F.m[0][0] = 1.0; F.m[0][1] = dt;  F.m[0][2] = 0.5 * dt * dt; // 位置转移
+    F.m[1][0] = 0.0; F.m[1][1] = 1.0; F.m[1][2] = dt; // 速度转移
+    F.m[2][0] = 0.0; F.m[2][1] = 0.0; F.m[2][2] = 1.0; // 加速度转移
 
     // 连续时间 CA 模型的离散过程噪声协方差
     const double dt2 = dt * dt;
     const double dt3 = dt2 * dt;
     const double dt4 = dt3 * dt;
     const double dt5 = dt4 * dt;
-    Mat3 Q;
+    Mat3 Q; // 过程噪声协方差矩阵
     Q.m[0][0] = q_ * dt5 / 20.0; Q.m[0][1] = q_ * dt4 / 8.0; Q.m[0][2] = q_ * dt3 / 6.0;
     Q.m[1][0] = Q.m[0][1];       Q.m[1][1] = q_ * dt3 / 3.0; Q.m[1][2] = q_ * dt2 / 2.0;
     Q.m[2][0] = Q.m[0][2];       Q.m[2][1] = Q.m[1][2];      Q.m[2][2] = q_ * dt;
@@ -110,9 +110,8 @@ class KalmanFilter {
     Mat3 FP;
     for (int i = 0; i < 3; ++i) {
       for (int j = 0; j < 3; ++j) {
-        double s = 0.0;
-        for (int k = 0; k < 3; ++k) s += F.m[i][k] * P_.m[k][j];
-        FP.m[i][j] = s;
+        FP.m[i][j] = 0.0;
+        for (int k = 0; k < 3; ++k) FP.m[i][j] += F.m[i][k] * P_.m[k][j];
       }
     }
     Mat3 Pn;
@@ -130,22 +129,22 @@ class KalmanFilter {
 
   // 用一帧观测更新状态
   void update(double z) {
-    const double innovation = z - x_.v[0];
-    const double p00 = P_.m[0][0];
-    const double S = P_.m[0][0] + R_;
+    const double innovation = z - x_.v[0]; // 新息：观测值 - 预测值
+    const double p00 = P_.m[0][0]; // 位置协方差
+    const double S = P_.m[0][0] + R_; 
 
-    double K[3];
-    K[0] = p00 / S;
+    double K[3]; // 卡尔曼增益
+    K[0] = P_.m[0][0] / S;
     K[1] = P_.m[1][0] / S;
     K[2] = P_.m[2][0] / S;
 
-    x_.v[0] += K[0] * innovation;
-    x_.v[1] += K[1] * innovation;
-    x_.v[2] += K[2] * innovation;
+    x_.v[0] += K[0] * innovation; // 位置更新
+    x_.v[1] += K[1] * innovation; // 速度更新
+    x_.v[2] += K[2] * innovation; // 加速度更新
 
     const double A[3][3] = {{1.0 - K[0], 0.0, 0.0},
                             {-K[1],      1.0, 0.0},
-                            {-K[2],      0.0, 1.0}};
+                            {-K[2],      0.0, 1.0}}; // 状态转移矩阵
     // AP = A · P
     double AP[3][3];
     for (int i = 0; i < 3; ++i) {
@@ -156,14 +155,14 @@ class KalmanFilter {
     // P = AP · A^T + R·K·K^T
     for (int i = 0; i < 3; ++i) {
       for (int j = 0; j < 3; ++j) {
-        const double s = AP[i][0] * A[j][0] + AP[i][1] * A[j][1] + AP[i][2] * A[j][2];
-        P_.m[i][j] = s + R_ * K[i] * K[j];
+        P_.m[i][j] = AP[i][0] * A[j][0] + AP[i][1] * A[j][1] + AP[i][2] * A[j][2] + R_ * K[i] * K[j];
       }
     }
 
     // 观测噪声方差的自适应估计：新息平方的指数滑动平均
     constexpr double kAlpha = 0.95;
     R_ = kAlpha * R_ + (1.0 - kAlpha) * (innovation * innovation - p00);
+    // 限制观测噪声协差的范围
     if (R_ < 1e-6) R_ = 1e-6;
     if (R_ > 1e4) R_ = 1e4;
   }
@@ -174,8 +173,8 @@ class KalmanFilter {
     if (dt > 0.0) {
       const double p = s.v[0] + s.v[1] * dt + 0.5 * s.v[2] * dt * dt;
       const double v = s.v[1] + s.v[2] * dt;
-      s.v[0] = p;
-      s.v[1] = v;
+      s.v[0] = p; // 位置预测
+      s.v[1] = v; // 速度预测
     }
     return s;
   }
@@ -190,7 +189,7 @@ class KalmanFilter {
  private:
   Vec3 x_;
   Mat3 P_;
-  double R_ = 1.0;
+  double R_ = 0.1;
   double q_ = 1000.0;
   std::int64_t last_stamp_ns_ = 0;
 };
